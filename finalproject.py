@@ -1,164 +1,133 @@
-accounts = {"testuser": ["Asdfg1234$", 0.0]}
-user = ""
+import os
+import discord
+from discord.ext import commands
+import requests
 
-# This function is O(n) with n being the length of the password as it iterates over the password multiple times throughout the algorithm
-def validatePassword(username, password):
-  sName = username
+token = os.environ['TOKEN']
 
-  sPassword = password
+# Used to store all of the current unadopted dogs
+notAdopted = []
 
-  sInitials = ""
+# Keep track of all the dogs a user has adopted
+adopted = {}
+channelID = 1101255593651617826
+intents = discord.Intents.default()
+intents.message_content = True
 
-  for word in sName.split():
-    sInitials += word[0]
+bot = commands.Bot(intents=intents, command_prefix='!')
 
-  checkCount = 0
 
-  if len(sPassword) < 8 or len(sPassword) > 12:
-    print("Password must be between 8 and 12 characters.")
+@bot.event
+async def on_ready():
+  global channelID
+  print("Bot is ready!")
+  await bot.get_channel(channelID).send("READY")
+
+
+# Generate a new picture of a dog with a name every 15 seconds
+
+
+# Check when a user reacts with the correct emoji and then allow them to adopt the dog
+# delete the message
+@bot.event
+async def on_reaction_add(reaction, user):
+  global adopted
+  global notAdopted
+  if (user == bot.user):
+    return
+  if reaction.emoji == '👍':
+    split = reaction.message.content.replace("\n", " ").split(" ")
+    length = len(split)
+    name = split[length - 2]
+    image = split[length - 1]
+    tuple = (name, image)
+
+    # Prevent dogs that have already been adopted by the !adopt command from getting adopted once the message is reacted to, as the message only gets deleted if the user reacts to the message
+    if tuple not in notAdopted:
+      await bot.get_channel(channelID).send(
+        f"Sorry {user.mention}, {name} has already been adopted!")
+      await reaction.message.delete()
+      return
+    notAdopted.remove(tuple)
+    if (user.name not in adopted):
+      adopted[user.name] = {}
+    adopted[user.name][name] = image
+    await reaction.message.channel.send(f"{user.mention} has adopted {name}!")
+    await reaction.message.delete()
+
+
+@bot.command()
+async def generate(self):
+  global channelID
+  global notAdopted
+  # Two API calls to generate a name and a picture of the dog
+  res = requests.get("https://dog.ceo/api/breeds/image/random")
+  image = res.json()["message"]
+  nameRes = requests.get("https://randomuser.me/api/")
+  name = nameRes.json()["results"][0]["name"]["first"]
+  message = f"The dog's name is {name}\n{image}"
+  sentMsg = await bot.get_channel(channelID).send(message)
+  notAdopted.append((name, image))
+  print(notAdopted)
+  await sentMsg.add_reaction('👍')
+
+
+# Used to list all of the unadopted dogs - the runtime of this function is O(n)
+# n is the length of the names in the notAdopted list
+@bot.command()
+async def unadopted(self):
+  global channelID
+  global notAdopted
+  if (len(notAdopted) == 0):
+    await bot.get_channel(channelID).send("No dogs are unadopted currently!")
+  for dog in notAdopted:
+    await bot.get_channel(channelID).send(
+      f"{dog[0]} has still not been adopted!")
+
+
+# Find the first name that matches
+# This method is O(n) worst case, as the for loop would have to iterate over the entire unadopted dogs list
+@bot.command()
+async def adopt(ctx, name=""):
+  global channelID
+  global adopted
+  global notAdopted
+  user = ctx.author
+  # Validate that user has provided a name argument
+  if (name == ""):
+    await bot.get_channel(channelID).send(
+      f"{user.mention}, please provide a name!")
+    return
+
+  # Iterate through all of the unadopted dogs to see if the name field matches
+  for dog in notAdopted:
+    if (dog[0].lower() == name.lower()):
+      notAdopted.remove(dog)
+      if (user.name not in adopted):
+        adopted[user.name] = {}
+      adopted[user.name][dog[0]] = dog[1]
+      await bot.get_channel(channelID).send(
+        f"{user.mention} has adopted {name}!")
+      return
+
+  await bot.get_channel(channelID).send(
+    f"{user.mention}, there are currently no unadopted dogs with that name!")
+
+
+# Used to help list all of the dog's that a user has currently adopted
+@bot.command()
+async def myadoptions(ctx):
+  global channelID
+  global adopted
+  user = ctx.author
+  if user.name not in adopted:
+    await bot.get_channel(channelID).send(
+      f"{user.mention}, you do not have any dogs adopted yet!")
   else:
-    checkCount += 1
-   
-  if sPassword.lower().startswith(("Pass", "pass")):
-    print("Password can’t start with Pass.")
-  else:
-    checkCount += 1
-
-  flag = False
-  for char in sPassword:
-    if char.isupper() == True:
-      flag = True
-      checkCount += 1
-      break
-  if (flag == False):
-    print("Password must contain at least 1 uppercase letter.")
-
-  flag = False
-  for char in sPassword:
-    if char.islower() == True:
-      flag = True
-      checkCount += 1
-      break
-  if (flag == False):
-    print("Password must contain at least 1 lowercase letter.")
-
-  flag = False
-  for char in sPassword:
-    if char.isdigit() == True:
-      flag = True
-      checkCount += 1
-      break
-  if (flag == False):
-    print("Password must contain atleast 1 number.")
-
-  sSpecialCharacters = "!@#$%^"
-  flag = False
-  for char in sPassword:
-    if char in sSpecialCharacters:
-      flag = True
-      checkCount += 1
-      break
-  if (flag == False):
-    print("Password must contain at least 1 of these special characters: ! @ # $ % ^")
-
-  # Use a list to generate the visisted characters to see if the password is unique
-  sPasswordList = []
-  # Use a dictionary to view the duplicates
-  sDuplicates = {}
-  uniqueFlag = True
-
-  for char in sPassword:
-    if char.lower() in sPasswordList:
-      sDuplicates[char.lower()] += 1
-      uniqueFlag = False
-    else:
-      sDuplicates[char.lower()] = 1
-      sPasswordList.append(char.lower())
-
-  if(uniqueFlag == False):
-    print("These characters appear more than once: ")
-    for letter in sDuplicates.keys():
-      if(sDuplicates[letter] > 1):
-        print(f"{letter}: {sDuplicates[letter]} times")
-  else:
-    checkCount += 1
-
-  if (checkCount == 7):
-    return True
-  else:
-    return False
+    userAdoptions = adopted[user.name]
+    await bot.get_channel(channelID).send(f"{user.mention}, you have adopted:")
+    for name, image in userAdoptions.items():
+      await bot.get_channel(channelID).send(f"{name}\n{image}")
 
 
-print("Welcome to The Bank! Would you like to sign in or create an account?")
-while (True):
-  try:
-    createOrSignIn = int(input("1. Create an account\n2. Sign in\nEnter your choice: "))
-
-    if(createOrSignIn == 1):
-      user = input("Please enter a username: ")
-      password = input("Please enter a password: ")
-
-      print("---------------------------")
-      if(user in accounts):
-        print("This username is already taken! Please try again. ")
-      if(not validatePassword(user, password)):
-        print("Password is invalid, please try again!")
-      else:
-        accounts[user] = [password, 0.0]
-        print("You have successfully created an account! Redirecting to main page.")
-    elif(createOrSignIn == 2):
-      user = input("Please enter your username: ")
-      password = input("Please enter your password: ")
-
-      print("---------------------------")
-      if(user in accounts and password == accounts[user][0]):
-        print(f"Welcome back {user}!")
-        break
-      else:
-        print("Your username/password may be incorrect, please try again!")
-    else:
-      print("Please enter a valid option!")
-  except:
-    print("Please enter a valid option!")
-  print("---------------------------")
-
-while (True):
-  try:
-    question = int(
-      input(
-        "What would you like to do today?\n1. Check Balance\n2. Deposit\n3. Withdraw\n4. Exit\nEnter your choice: "
-      ))
-
-    print("---------------------------")
-
-    if(question == 1):
-      print(f"Your current balance: {accounts[user][1]}!")
-    elif(question == 2):
-      try:
-        amount = float(input("How much would you like to deposit? "))
-        userAccount = accounts[user]
-        userAccount[1] += amount
-        accounts[user] = userAccount
-        print(f"Your new balance is: {accounts[user][1]}")
-      except:
-        print("Please enter a number!")
-    elif(question == 3):
-      try:
-        amount = float(input("How much would you like to withdraw? "))
-        userAccount = accounts[user]
-        if(amount > userAccount[1]):
-          print("Amount exceeds balance!")
-        else:
-          userAccount[1] -= amount
-          accounts[user] = userAccount
-          print(f"Your new balance is: {accounts[user][1]}")
-      except:
-        print("Please enter a number!")
-    elif(question == 4):
-      print("Thank you for visiting The Bank! Take care!")
-      break
-    else:
-      print("Please enter a valid option!")
-  except:
-    print("Please enter a valid option!")
-  print("---------------------------")
+bot.run(token)
