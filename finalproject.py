@@ -16,16 +16,11 @@ intents.message_content = True
 
 bot = commands.Bot(intents=intents, command_prefix='!')
 
-
 @bot.event
 async def on_ready():
   global channelID
   print("Bot is ready!")
   await bot.get_channel(channelID).send("READY")
-
-
-# Generate a new picture of a dog with a name every 15 seconds
-
 
 # Check when a user reacts with the correct emoji and then allow them to adopt the dog
 # delete the message
@@ -55,7 +50,7 @@ async def on_reaction_add(reaction, user):
     await reaction.message.channel.send(f"{user.mention} has adopted {name}!")
     await reaction.message.delete()
 
-
+# Generate a new picture of a dog on command
 @bot.command()
 async def generate(self):
   global channelID
@@ -71,7 +66,6 @@ async def generate(self):
   print(notAdopted)
   await sentMsg.add_reaction('👍')
 
-
 # Used to list all of the unadopted dogs - the runtime of this function is O(n)
 # n is the length of the names in the notAdopted list
 @bot.command()
@@ -83,7 +77,6 @@ async def unadopted(self):
   for dog in notAdopted:
     await bot.get_channel(channelID).send(
       f"{dog[0]} has still not been adopted!")
-
 
 # Find the first name that matches
 # This method is O(n) worst case, as the for loop would have to iterate over the entire unadopted dogs list
@@ -113,7 +106,6 @@ async def adopt(ctx, name=""):
   await bot.get_channel(channelID).send(
     f"{user.mention}, there are currently no unadopted dogs with that name!")
 
-
 # Used to help list all of the dog's that a user has currently adopted
 @bot.command()
 async def myadoptions(ctx):
@@ -128,6 +120,5 @@ async def myadoptions(ctx):
     await bot.get_channel(channelID).send(f"{user.mention}, you have adopted:")
     for name, image in userAdoptions.items():
       await bot.get_channel(channelID).send(f"{name}\n{image}")
-
 
 bot.run(token)
